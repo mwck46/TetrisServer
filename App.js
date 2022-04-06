@@ -66,6 +66,7 @@ class GameMessage {
 
 const wss = new WebSocketServer({ port: 18080 });
 var games = []
+var players = []
 
 
 wss.on('connection', function connection(ws) {
@@ -86,6 +87,7 @@ wss.on('connection', function connection(ws) {
       const newGame = new Game()
       const player1 = new Player(msgObj.sender, ws)
       newGame.AddPlayer(player1)
+      players.push(player1)
       games.push(newGame)
       const msg = new GameMessage("SERVER", "GAMEID", newGame.gameId).toString()
       console.log('send: %s', msg);
@@ -97,12 +99,12 @@ wss.on('connection', function connection(ws) {
         ws.send(new GameMessage("SERVER", "ERROR", "Game ID not found").toString())
       }
       const player2 = new Player(msgObj.sender, ws)
+      players.push(player2)
       game.AddPlayer(player2)
       ws.send(new GameMessage("SERVER", "JOINGAME", "OK").toString())
     } else if (msgObj.message === "REQUESTSTART") {
       const gameId = msgObj.remarks
       const game = games.find(g => g.gameId == gameId) // DON'T use "===", it compares the true memory address
-
       if (!game) {
         ws.send(new GameMessage("SERVER", "ERROR", "Game ID not found").toString())
       }
@@ -110,6 +112,23 @@ wss.on('connection', function connection(ws) {
       for(let player of game.players){
         player.webSock.send(new GameMessage("SERVER", "GAMESTART").toString())
       }
+    }else if (msgObj.message === "TICK") {
+      const player = players.find(p => p.playerId == msgObj.sender) // DON'T use "===", it compares the true memory address
+      if (!player) {
+        ws.send(new GameMessage("SERVER", "ERROR", "Player ID invalid").toString())
+      }
+      const gameId = player.gameId 
+      const game = games.find(g => g.gameId == gameId) // DON'T use "===", it compares the true memory address
+      if (!game) {
+        ws.send(new GameMessage("SERVER", "ERROR", "Game ID not found").toString())
+      }
+      for(let player of game.players){
+        // don't send to yourself
+        if(player.playerId != msgObj.sender){
+          player.webSock.send(new GameMessage("RIVAL", "TICK", msgObj.remarks).toString())
+        }
+      }
+
     }
 
   });
