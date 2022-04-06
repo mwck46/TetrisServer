@@ -1,10 +1,10 @@
 import { WebSocketServer } from 'ws';
 
-MAX_GAME = 1000
+const MAX_GAME = 100
 
 class Game {
   constructor() {
-    this.gameId = generateGameId()
+    this.gameId = Game.generateGameId()
     this.players = []
   }
 
@@ -26,40 +26,41 @@ class Game {
     }
   }
 
-  AddPlayer(player){
+  AddPlayer(player) {
     player.gameId = this.gameId
     this.players.push(player)
   }
 }
 
 class Player {
-  constructor(playerId) {
-    this.playerId = uuid
+  constructor(playerId, webSock) {
+    this.playerId = playerId 
+    this.webSock = webSock 
   }
 
-  setGameId(gameId){
+  setGameId(gameId) {
     this.gameId = gameId
   }
 }
 
 class GameMessage {
-  constructor(sender, msg, remarks = null) {
+  constructor(sender, message, remarks = null) {
     this.sender = sender
-    this.msg = msg 
-    this.remarks = remarks 
+    this.message = message
+    this.remarks = remarks
   }
 
   toString() {
-    return JSON.stringify([
-      "sender" = this.sender,
-      "message" = this.msg,
-      "remarks" = this.remarks
-    ])
+    return JSON.stringify({
+      sender: this.sender,
+      message: this.message,
+      remarks: this.remarks
+    })
   }
 
   static parseFromSocket(msg) {
-    msgObj = JSON.parse(msg)
-    return new GameMessage(msgObj.sender, msgObj.msg, msgObj.remarks)
+    const msgObj = JSON.parse(msg)
+    return new GameMessage(msgObj.sender, msgObj.message, msgObj.remarks)
   }
 }
 
@@ -68,57 +69,52 @@ var games = []
 
 
 wss.on('connection', function connection(ws) {
-  ws.send(new GameMessage(SERVER, "Connected").toString());
+  ws.send(new GameMessage("SERVER", "Connected").toString());
   if (games.length >= MAX_GAME) {
-    ws.send(new GameMessage(SERVER, "ERROR", "Server is currently full"))
+    ws.send(new GameMessage("SERVER", "ERROR", "Server is currently full"))
     ws.close();
   }
 
 
 
   ws.on('message', function message(rawmsg) {
-    console.log('received: %s', msg);
+    console.log('received: %s', rawmsg);
 
-    const msgObj = GameMessage.parseFromSocket(rawmsg)
+    let msgObj = GameMessage.parseFromSocket(rawmsg)
 
-    //const arr = msg.split(':')
-    //const source = arr[0]
-    //const data = arr[1]
-
-    if(msgObj.msg === "NEWGAME"){
+    if (msgObj.message === "NEWGAME") {
       const newGame = new Game()
-      const player1 = new Player()
+      const player1 = new Player(msgObj.sender, ws)
       newGame.AddPlayer(player1)
       games.push(newGame)
-      ws.send(new GameMessage("SERVER", "GAMEID", newGame.gameId))
-    }else if(msgObj.msg === "JOINGAME"){
+      const msg = new GameMessage("SERVER", "GAMEID", newGame.gameId).toString()
+      console.log('send: %s', msg);
+      ws.send(msg)
+    } else if (msgObj.message === "JOINGAME") {
       const gameId = msgObj.remarks
-      const game = games.find(g => g.gameId === gameId)
-      if(!game){
-        ws.send(new GameMessage("SERVER", "JOINGAME", "Game ID not found"))
+      const game = games.find(g => g.gameId == gameId) // DON'T use "===", it compares the true memory address
+      if (!game) {
+        ws.send(new GameMessage("SERVER", "ERROR", "Game ID not found").toString())
+      }
+      const player2 = new Player(msgObj.sender, ws)
+      game.AddPlayer(player2)
+      ws.send(new GameMessage("SERVER", "JOINGAME", "OK").toString())
+    } else if (msgObj.message === "REQUESTSTART") {
+      const gameId = msgObj.remarks
+      const game = games.find(g => g.gameId == gameId) // DON'T use "===", it compares the true memory address
+
+      if (!game) {
+        ws.send(new GameMessage("SERVER", "ERROR", "Game ID not found").toString())
+      }
+
+      for(let player of game.players){
+        player.webSock.send(new GameMessage("SERVER", "GAMESTART").toString())
       }
     }
 
-
-    //if (data === "HOST?") {
-    //  if (!hostId) {
-    //    ws.send('SERVER:CHAR=H');
-    //    hostId = source
-    //  } else if (!playerId) {
-    //    ws.send('SERVER:CHAR=P');
-    //    playerId = source
-    //  } else {
-    //    ws.send('SERVER:CHAR=V');
-    //    playerId = source
-    //  }
-    //} else if (data === "RESET") {
-    //  console.log("reset")
-    //} else {
-    //  wss.broadcast(msg)
-    //}
   });
 
-  
+
   ws.on('close', function close() {
   })
 
