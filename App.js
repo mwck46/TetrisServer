@@ -1,6 +1,7 @@
 import { WebSocketServer } from 'ws';
 
 const MAX_GAME = 100
+const MAX_BLOCK_TYPES = 7
 
 class Game {
   constructor() {
@@ -24,6 +25,14 @@ class Game {
         return gameId
       }
     }
+  }
+
+  static generateNextNBlocks(N){
+    let nextN = []
+    for(let i=0; i<N; ++i){
+      nextN.push(Math.floor(Math.random()*MAX_BLOCK_TYPES))
+    }
+    return nextN
   }
 
   AddPlayer(player) {
@@ -109,8 +118,9 @@ wss.on('connection', function connection(ws) {
         ws.send(new GameMessage("SERVER", "ERROR", "Game ID not found").toString())
       }
 
+      let next20Blocks = Game.generateNextNBlocks(20)
       for(let player of game.players){
-        player.webSock.send(new GameMessage("SERVER", "GAMESTART").toString())
+        player.webSock.send(new GameMessage("SERVER", "GAMESTART", JSON.stringify(next20Blocks)).toString())
       }
     }else if (msgObj.message === "TICK") {
       const player = players.find(p => p.playerId == msgObj.sender) // DON'T use "===", it compares the true memory address
@@ -129,6 +139,17 @@ wss.on('connection', function connection(ws) {
         }
       }
 
+    }else if (msgObj.message === "REQUESTBLOCK"){
+      const gameId = msgObj.remarks
+      const game = games.find(g => g.gameId == gameId) // DON'T use "===", it compares the true memory address
+      if (!game) {
+        ws.send(new GameMessage("SERVER", "ERROR", "Game ID not found").toString())
+      }
+
+      let next10Blocks = Game.generateNextNBlocks(10)
+      for(let player of game.players){
+        player.webSock.send(new GameMessage("SERVER", "NEWBLOCK", JSON.stringify(next10Blocks)).toString())
+      }
     }
 
   });
