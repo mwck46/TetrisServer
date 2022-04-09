@@ -29,10 +29,10 @@ class Game {
     }
   }
 
-  static generateNextNBlocks(N){
+  static generateNextNBlocks(N) {
     let nextN = []
-    for(let i=0; i<N; ++i){
-      nextN.push(Math.floor(Math.random()*MAX_BLOCK_TYPES))
+    for (let i = 0; i < N; ++i) {
+      nextN.push(Math.floor(Math.random() * MAX_BLOCK_TYPES))
     }
     return nextN
   }
@@ -45,8 +45,8 @@ class Game {
 
 class Player {
   constructor(playerId, webSock) {
-    this.playerId = playerId 
-    this.webSock = webSock 
+    this.playerId = playerId
+    this.webSock = webSock
   }
 
   setGameId(gameId) {
@@ -90,12 +90,13 @@ wss.on('connection', function connection(ws) {
 
 
   ws.on('message', function message(rawmsg) {
-    console.log('received: %s', rawmsg);
+    //console.log('received: %s', rawmsg);
 
     let msgObj = GameMessage.parseFromSocket(rawmsg)
 
     if (msgObj.message === "NEWGAME") {
       const newGame = new Game()
+      ws.gameId = newGame.gameId
       const player1 = new Player(msgObj.sender, ws)
       newGame.AddPlayer(player1)
       players.push(player1)
@@ -108,7 +109,9 @@ wss.on('connection', function connection(ws) {
       const game = games.find(g => g.gameId == gameId) // DON'T use "===", it compares the true memory address
       if (!game) {
         ws.send(new GameMessage("SERVER", "ERROR", "Game ID not found").toString())
+        return
       }
+      ws.gameId = game.gameId
       const player2 = new Player(msgObj.sender, ws)
       players.push(player2)
       game.AddPlayer(player2)
@@ -118,31 +121,34 @@ wss.on('connection', function connection(ws) {
       const game = games.find(g => g.gameId == gameId) // DON'T use "===", it compares the true memory address
       if (!game) {
         ws.send(new GameMessage("SERVER", "ERROR", "Game ID not found").toString())
+        return
       }
 
       //let next20Blocks = [0,1,2,3,4,5,6].concat(Game.generateNextNBlocks(20))
       let next20Blocks = Game.generateNextNBlocks(20)
-      for(let player of game.players){
+      for (let player of game.players) {
         player.webSock.send(new GameMessage("SERVER", "GAMESTART", JSON.stringify(next20Blocks)).toString())
       }
-    }else if (msgObj.message === "TICK") {
+    } else if (msgObj.message === "TICK") {
       const player = players.find(p => p.playerId == msgObj.sender) // DON'T use "===", it compares the true memory address
       if (!player) {
         ws.send(new GameMessage("SERVER", "ERROR", "Player ID invalid").toString())
+        return
       }
-      const gameId = player.gameId 
+      const gameId = player.gameId
       const game = games.find(g => g.gameId == gameId) // DON'T use "===", it compares the true memory address
       if (!game) {
         ws.send(new GameMessage("SERVER", "ERROR", "Game ID not found").toString())
+        return
       }
-      for(let player of game.players){
+      for (let player of game.players) {
         // don't send to yourself
-        if(player.playerId != msgObj.sender){
+        if (player.playerId != msgObj.sender) {
           player.webSock.send(new GameMessage("RIVAL", "TICK", msgObj.remarks).toString())
         }
       }
 
-    }else if (msgObj.message === "REQUESTBLOCK"){
+    } else if (msgObj.message === "REQUESTBLOCK") {
       const gameId = msgObj.remarks
       const game = games.find(g => g.gameId == gameId) // DON'T use "===", it compares the true memory address
       if (!game) {
@@ -150,7 +156,7 @@ wss.on('connection', function connection(ws) {
       }
 
       let next10Blocks = Game.generateNextNBlocks(10)
-      for(let player of game.players){
+      for (let player of game.players) {
         player.webSock.send(new GameMessage("SERVER", "NEWBLOCK", JSON.stringify(next10Blocks)).toString())
       }
     }
@@ -159,6 +165,24 @@ wss.on('connection', function connection(ws) {
 
 
   ws.on('close', function close() {
+     const gameId = ws.gameId
+     const game = games.find(g => g.gameId == gameId) // DON'T use "===", it compares the true memory address
+     //console.log(ws.gameId)
+     if (!game) {
+       return
+     }
+     //console.log(game)
+     for (let player of game.players) {
+       if (player.webSock !== ws) {
+        player.webSock.send(new GameMessage("SERVER", "GAMEOVER", "WON").toString())
+        player.webSock.close()
+       }
+     }
+
+     games = games.filter(function(g){
+       return g.gameId != gameId
+     })
+
   })
 
 
