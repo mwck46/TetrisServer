@@ -3,6 +3,8 @@ import { WebSocketServer } from 'ws';
 const MAX_GAME = 100
 const MAX_BLOCK_TYPES = 7
 
+
+
 class Game {
   constructor() {
     this.gameId = Game.generateGameId()
@@ -118,6 +120,7 @@ wss.on('connection', function connection(ws) {
         ws.send(new GameMessage("SERVER", "ERROR", "Game ID not found").toString())
       }
 
+      //let next20Blocks = [0,1,2,3,4,5,6].concat(Game.generateNextNBlocks(20))
       let next20Blocks = Game.generateNextNBlocks(20)
       for(let player of game.players){
         player.webSock.send(new GameMessage("SERVER", "GAMESTART", JSON.stringify(next20Blocks)).toString())
