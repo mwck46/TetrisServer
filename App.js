@@ -90,7 +90,7 @@ wss.on('connection', function connection(ws) {
 
 
   ws.on('message', function message(rawmsg) {
-    //console.log('received: %s', rawmsg);
+    console.log('received: %s', rawmsg);
 
     let msgObj = GameMessage.parseFromSocket(rawmsg)
 
@@ -121,13 +121,16 @@ wss.on('connection', function connection(ws) {
       const game = games.find(g => g.gameId == gameId) // DON'T use "===", it compares the true memory address
       if (!game) {
         ws.send(new GameMessage("SERVER", "ERROR", "Game ID not found").toString())
+        console.log('game id not found');
         return
       }
 
       //let next20Blocks = [0,1,2,3,4,5,6].concat(Game.generateNextNBlocks(20))
       let next20Blocks = Game.generateNextNBlocks(20)
       for (let player of game.players) {
-        player.webSock.send(new GameMessage("SERVER", "GAMESTART", JSON.stringify(next20Blocks)).toString())
+        const msg = new GameMessage("SERVER", "GAMESTART", JSON.stringify(next20Blocks)).toString();
+        player.webSock.send(msg)
+        console.log('send: %s', msg);
       }
     } else if (msgObj.message === "TICK") {
       const player = players.find(p => p.playerId == msgObj.sender) // DON'T use "===", it compares the true memory address

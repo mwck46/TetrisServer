@@ -1,0 +1,1 @@
+{"version":"1.0.0","name":"tetrisserver","dependencies":{"nodemon":{"version":"2.0.15"},"ws":{"version":"8.5.0"}}}
